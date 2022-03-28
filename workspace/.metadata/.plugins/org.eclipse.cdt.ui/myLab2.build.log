@@ -1,0 +1,12 @@
+11:21:37 **** Rebuild of configuration Debug for project myLab2 ****
+Info: Internal Builder is used for build
+arm-nilrt-linux-gnueabi-gcc -DMyRio_1900 "-IC:\\Users\\alicl\\workspace\\C Support for myRIO\\source" -O0 -g3 -Wall -c -fmessage-length=0 -o "C_Support\\MyRio.o" "..\\..\\C Support for myRIO\\source\\MyRio.c" 
+arm-nilrt-linux-gnueabi-gcc -DMyRio_1900 "-IC:\\Users\\alicl\\workspace\\C Support for myRIO\\source" -O0 -g3 -Wall -c -fmessage-length=0 -o main.o "..\\main.c" 
+..\main.c: In function 'printf_lcd':
+..\main.c:173:6: warning: variable 'val' set but not used [-Wunused-but-set-variable]
+arm-nilrt-linux-gnueabi-gcc -DMyRio_1900 "-IC:\\Users\\alicl\\workspace\\C Support for myRIO\\source" -O0 -g3 -Wall -c -fmessage-length=0 -o "C_Support\\NiFpga.o" "..\\..\\C Support for myRIO\\source\\NiFpga.c" 
+arm-nilrt-linux-gnueabi-gcc -DMyRio_1900 "-IC:\\Users\\alicl\\workspace\\C Support for myRIO\\source" -O0 -g3 -Wall -c -fmessage-length=0 -o "C_Support\\IRQConfigure.o" "..\\..\\C Support for myRIO\\source\\IRQConfigure.c" 
+arm-nilrt-linux-gnueabi-gcc "-LC:\\Users\\alicl\\workspace\\C Support for myRIO\\source" -lm -o myLab2 main.o "C_Support\\NiFpga.o" "C_Support\\MyRio.o" "C_Support\\IRQConfigure.o" "..\\..\\me477Library_v4_distribution\\Debug\\libme477Library_v4.a" -ldl -lvisa -lpthread 
+
+11:21:40 Build Finished (took 2s.107ms)
+

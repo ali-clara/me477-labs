@@ -1,0 +1,9 @@
+11:21:24 **** Rebuild of configuration Debug for project me477Library_v4_distribution ****
+Info: Internal Builder is used for build
+arm-nilrt-linux-gnueabi-gcc -DMyRio_1900 "-IC:\\Users\\alicl\\workspace\\me477Library_v4_distribution\\C_Support" -O0 -g3 -Wall -c -fmessage-length=0 -o "C_Support\\NiFpga.o" "..\\C_Support\\NiFpga.c" 
+arm-nilrt-linux-gnueabi-gcc -DMyRio_1900 "-IC:\\Users\\alicl\\workspace\\me477Library_v4_distribution\\C_Support" -O0 -g3 -Wall -c -fmessage-length=0 -o "C_Support\\IRQConfigure.o" "..\\C_Support\\IRQConfigure.c" 
+arm-nilrt-linux-gnueabi-gcc -DMyRio_1900 "-IC:\\Users\\alicl\\workspace\\me477Library_v4_distribution\\C_Support" -O0 -g3 -Wall -c -fmessage-length=0 -o "C_Support\\MyRio.o" "..\\C_Support\\MyRio.c" 
+arm-nilrt-linux-gnueabi-ar -r libme477Library_v4_distribution.a "C_Support\\NiFpga.o" "C_Support\\MyRio.o" "C_Support\\IRQConfigure.o" 
+
+11:21:28 Build Finished (took 3s.970ms)
+

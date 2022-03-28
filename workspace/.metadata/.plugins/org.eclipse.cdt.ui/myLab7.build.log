@@ -1,0 +1,9 @@
+17:31:09 **** Incremental Build of configuration Debug for project myLab7 ****
+Info: Internal Builder is used for build
+arm-nilrt-linux-gnueabi-gcc -DMyRio_1900 "-IC:\\Users\\alicl\\workspace\\C Support for myRIO\\source" -O0 -g3 -Wall -c -fmessage-length=0 -o main.o "..\\main.c" 
+..\main.c: In function 'main':
+..\main.c:63:10: warning: variable 'irq_status' set but not used [-Wunused-but-set-variable]
+arm-nilrt-linux-gnueabi-gcc "-LC:\\Users\\alicl\\workspace\\C Support for myRIO\\source" -lm -o myLab7 main.o "C_Support\\NiFpga.o" "C_Support\\MyRio.o" "C_Support\\IRQConfigure.o" "..\\..\\me477Library_v4_distribution\\Debug\\libme477Library_v4.a" -ldl -lvisa -lpthread 
+
+17:31:11 Build Finished (took 1s.386ms)
+

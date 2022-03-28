@@ -1,0 +1,71 @@
+/* Lab 7 - Ali Jones*/
+
+/* includes */
+#include "stdio.h"
+#include "MyRio.h"
+#include "me477.h"
+#include <string.h>
+#include "ctable2.h"
+#include "TimerIRQ.h"
+#include <pthread.h>
+#include "emulate.h"
+
+/* prototypes */
+//double	double_in(char *prompt);
+
+/* definitions */
+
+/* global variables */
+typedef struct {
+	NiFpga_IrqContext irqContext;	// context
+	table *a_table;		// pointer to table
+	NiFpga_Bool irqThreadRdy;	// thread ready flag
+} ThreadResource;
+
+uint32_t timeoutValue;
+
+int main(int argc, char **argv)
+{
+	NiFpga_Status status;
+	int32_t irq_status;
+	MyRio_IrqTimer irqTimer0;
+	ThreadResource irqThread0;
+	pthread_t thread;
+
+    status = MyRio_Open();		    /*Open the myRIO NiFpga Session.*/
+    if (MyRio_IsNotSuccess(status)) return status;
+
+    // initialize table editor variables
+
+
+    // Registers corresponding to the IRQ channel
+    irqTimer0.timerWrite = IRQTIMERWRITE;
+    irqTimer0.timerSet = IRQTIMERSETTIME;
+    timeoutValue = 500;
+
+    irq_status = Irq_RegisterTimerIrq( &irqTimer0,
+    							   	   &irqThread0.irqContext,
+    							   	   timeoutValue);
+
+    // Set the indicator to allow the new thread
+    irqThread0.irqThreadRdy = NiFpga_True;
+
+    // Create new thread to catch the IRQ
+    irq_status = pthread_create( &thread,
+    							 NULL,
+    							 Timer_Irq_Thread,
+    							 &irqThread0);
+
+    // Initialize the thread resource to point to table
+    irqThread0.a_table = my_table;
+
+    // Set the thread ready flag
+    irqThread0.irqThreadRdy = NiFpga_True;
+
+    //my code here
+    printf("Lab #7 Hello World!\n");			// Print to Console
+    printf_lcd("\fLab #7 Hello World!\n");		// Print to LCD screen
+
+	status = MyRio_Close();	 /*Close the myRIO NiFpga Session. */
+	return status;
+}

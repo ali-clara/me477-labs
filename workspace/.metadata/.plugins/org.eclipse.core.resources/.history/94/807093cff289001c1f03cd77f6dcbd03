@@ -1,0 +1,92 @@
+/* Lab #<number> - <your name> */
+
+/* includes */
+#include <stdio.h>
+#include "Encoder.h"
+#include "MyRio.h"
+#include "DIO.h"
+#include "me477.h"
+#include <unistd.h>
+#include <string.h>
+#include "matlabfiles.h"
+#include "emulate.h"
+
+
+/* prototypes */
+double	double_in(char *prompt);
+NiFpga_Status EncoderC_initialize(NiFpga_Session myrio_session, MyRio_Encoder *channel);
+uint32_t Encoder_Counter(MyRio_Encoder* channel);
+void stateHigh(void);
+void stateLow(void);
+void stateSpeed(void);
+void stateStop(void);
+void initializeSM(void);
+void wait(void);
+
+/* definitions */
+typedef enum {STATE_A=0, STATE_B, STATE_C} State_Type;
+static void (*state_table[])(void)={stateA, stateB, stateC};
+
+/* global declarations */
+NiFpga_Session myrio_session;
+MyRio_Encoder encC0;
+static State_Type curr_state;
+static int Clock;
+static int out;
+
+int main(int argc, char **argv)
+{
+	NiFpga_Status status;
+	static int N;
+	static int M;
+	char *prompt_N = "Enter N";
+	char *prompt_M = "Enter M";
+
+    status = MyRio_Open();		    /*Open the myRIO NiFpga Session.*/
+    if (MyRio_IsNotSuccess(status)) return status;
+
+    //my code here
+    initializeSM();
+
+    N = double_in(prompt_N);		// number of wait intervals in each BTI
+    M = double_in(prompt_M);		// number of intervals that the motor signal is "on"
+
+    // main state transition loop
+    while(1){
+    	state_table[curr_state]();
+    	wait();
+    	Clock++;
+    }
+
+    status = MyRio_Close();	 /*Close the myRIO NiFpga Session. */
+	return status;
+}
+
+void stateA(void){
+	if( Clock = 2 ){ 			// change state?
+		curr_state = STATE_B; 	// new state
+		out = 1;				// new output
+	}
+}
+
+void stateB(void){
+	if( Clock == 5 ){			// change state?
+		curr_state = STATE_C;	// new state
+		out = 2;				// new output
+	}
+}
+
+void stateC(void){
+	if( Clock == 9 ){			// change state?
+		Clock = 0;				// reset clock
+		curr_state = STATE_A;	// new state
+		out = 0;				// new output
+	}
+}
+
+void initializeSM(void){
+	Ch7.dir = DIOA_70DIR;
+	curr_state = STATE_A;
+	out = 0;
+	Clock = 1;
+}

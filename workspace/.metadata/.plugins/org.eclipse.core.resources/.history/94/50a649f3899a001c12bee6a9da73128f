@@ -1,0 +1,245 @@
+/* Lab 7 - Ali Jones*/
+
+/* includes */
+#include "stdio.h"
+#include "MyRio.h"
+#include "me477.h"
+#include <string.h>
+#include "ctable2.h"
+#include "TimerIRQ.h"
+#include <pthread.h>
+//#include "emulate.h"
+
+/* definitions */
+void* Timer_Irq_Thread(void* resource);
+double vel(void);
+
+struct biquad{
+	double b0; double b1; double b2; 	// numerator
+	double a0; double a1; double a2;	// denominator
+	double e0; double e1; double e2;	// input (error signal)
+	double u1; double u2;				// output (voltage)
+};
+
+#define SATURATE(x,lo,hi)((x)<(lo)?(lo):(x)>(hi)?(hi):(x))
+#define KI = 2.0
+#define KP = 0.1
+
+/* prototypes */
+double cascade(	double ein,			// input
+				struct biquad *fa,	// biquad array
+				int ns, 			// number of biquad sections
+				double vmin,		// min output (saturation lower limit)
+				double vmax);		// max output (saturation upper limit)
+
+
+/* global variables */
+typedef struct {
+	NiFpga_IrqContext irqContext;	// context
+	table *a_table;				// pointer to table
+	NiFpga_Bool irqThreadRdy;	// thread ready flag
+} ThreadResource;
+
+uint32_t timeoutValue;
+MyRio_Encoder encC0;
+
+int main(int argc, char **argv)
+{
+	NiFpga_Status status;
+	int32_t irq_status;
+	MyRio_IrqTimer irqTimer0;
+	ThreadResource irqThread0;
+	pthread_t thread;
+	char *Table_Title = "Motor Control Table";
+
+    status = MyRio_Open();		    /*Open the myRIO NiFpga Session.*/
+    if (MyRio_IsNotSuccess(status)) return status;
+
+    // initialize table editor variables
+    table my_table[] = {
+    		{"V_ref: (rpm)", 1, 0.},
+    		{"V_act: (rpm)", 0, 0.},
+    		{"VDAout (mV)",  0, 0.},
+    		{"Kp (V-s/rad)", 1, 0.},
+    		{"Ki (V/rad)",   1, 0.},
+    		{"BTI (ms)",     1, 5.0},
+    };
+
+    // Registers corresponding to the IRQ channel
+    irqTimer0.timerWrite = IRQTIMERWRITE;
+    irqTimer0.timerSet = IRQTIMERSETTIME;
+    timeoutValue = 500;
+
+    irq_status = Irq_RegisterTimerIrq( &irqTimer0,
+    							   	   &irqThread0.irqContext,
+    							   	   timeoutValue);
+
+    // Set the indicator to allow the new thread
+    irqThread0.irqThreadRdy = NiFpga_True;
+
+    // Create new thread to catch the IRQ
+    irq_status = pthread_create( &thread,
+    							 NULL,
+    							 Timer_Irq_Thread,
+    							 &irqThread0);
+
+    // Initialize the thread resource to point to table
+    irqThread0.a_table = my_table;
+
+    // Set the thread ready flag
+    irqThread0.irqThreadRdy = NiFpga_True;
+
+    // call the table editor
+    ctable2(Table_Title, my_table, 6);
+
+    // terminate thread
+	irqThread0.irqThreadRdy = NiFpga_False;
+	irq_status = pthread_join(thread, NULL);
+
+    // unregister timer interrupt
+	irq_status = Irq_UnregisterTimerIrq( &irqTimer0,
+										 irqThread0.irqContext);
+
+	status = MyRio_Close();	 /*Close the myRIO NiFpga Session. */
+	return status;
+}
+
+void* Timer_Irq_Thread(void* resource){
+
+	MyRio_Aio CI0, CO0;
+	double curr_speed, rpm, error;
+	extern NiFpga_Session myrio_session;
+	ThreadResource* threadResource = (ThreadResource*) resource;
+	double vmin = -7.5;
+	double vmax = 7.5;
+	double T, output, vact_rad, vref_rad;
+
+	// set up the biquad
+	int myFilter_ns = 1;
+	static struct biquad myFilter[] = {
+				{0., 0., 0., 1., -1., 0, 0, 0, 0}
+	};
+	struct biquad *filter = myFilter;
+
+	// rename the inputs
+	double *vref = &((threadResource->a_table+0)->value);
+	double *vact = &((threadResource->a_table+1)->value);
+	double *vdaout = &((threadResource->a_table+2)->value);
+	double *kp = &((threadResource->a_table+3)->value);
+	double *ki = &((threadResource->a_table+4)->value);
+	double *bti = &((threadResource->a_table+5)->value);
+
+	// initialize the I/O and set motor voltage to zero
+	AIO_initialize(&CI0, &CO0);
+	Aio_Write(&CI0, 0);
+
+	// initialize the encoder interface
+	EncoderC_initialize(myrio_session, &encC0);
+
+	while (threadResource->irqThreadRdy == NiFpga_True){
+			/* pause the loop while waiting for interrupt */
+			uint32_t irqAssert = 0;
+			Irq_Wait( threadResource->irqContext,
+					  TIMERIRQNO,
+					  &irqAssert,
+					  (NiFpga_Bool*) &(threadResource->irqThreadRdy));
+			/* schedule the next interrupt */
+			NiFpga_WriteU32( myrio_session,
+							 IRQTIMERWRITE,
+							 timeoutValue);
+			NiFpga_WriteBool( myrio_session,
+							  IRQTIMERSETTIME,
+							  NiFpga_True);
+
+			if(irqAssert){
+				/* service interrupt */
+
+				// find current speed
+				curr_speed = vel();
+				*vact = curr_speed / 2000 / (*bti/1000) * 60; // convert from BDI/BTI to rpm
+				vact_rad = *vact * (2*3.14) / 60;	// rad/s
+				vref_rad = *vref * (2*2.14) / 60;	// rad/s
+
+				// calculate coefficients
+				T = (*bti) / 1000;		 // sample time (sec)
+				*kp = KP;
+				*ki = KI;
+				filter->a0 = 1.0;
+				filter->a1 = -1.0;
+				filter->b0 = (*kp) + 1/2*(*ki)*T;
+				filter->b1 = -(*kp) + 1/2*(*ki)*T;
+
+				// calculate error signal
+				error = vref_rad - vact_rad;
+
+				// call cascade to compute control value
+				output = cascade(error, myFilter, myFilter_ns, vmin, vmax);
+
+				// output control value
+				Aio_Write(&CI0, output);
+
+				// change values in table
+				*vdaout = output*1000;		// voltage out (mV)
+				//*vact = rpm;				// velocity actual
+
+				/* acknowledge interrupt */
+				Irq_Acknowledge(irqAssert);
+			}
+		}
+
+	pthread_exit(NULL);
+	return NULL;
+}
+
+/*--------------------------------------------------
+ Function vel
+ 	 Purpose:		calculates velocity via encoder
+ 	 Parameters:	none
+ 	 Returns: 		motor angular velocity in BDI/BTI
+ *-------------------------------------------------*/
+double vel(void){
+	double curr_speed;
+	static int c_n, c_n1;	// current encoder count and previous encoder count
+	static int initial_call = 0;
+
+	c_n = Encoder_Counter(&encC0);	// get current count from encoder
+
+	if (initial_call == 0){		// if it's the first call,
+		c_n1 = c_n;					// set previous count = current count
+		initial_call++;
+	}
+
+	curr_speed = c_n - c_n1;	// calculate speed
+	c_n1 = c_n;					// set previous count = current count
+
+	return curr_speed;
+}
+
+double cascade(double ein, struct biquad *fa, int ns, double vmin, double vmax){
+	int i;
+	struct biquad *f;
+	f = fa;
+	double u0;
+
+	for (i = 1; i <= ns; i++){
+		if(i == 1){
+			f->e0 = ein;
+			u0 = ein;
+		}
+		else{
+			f->e0 = u0;
+		}
+		u0 = (f->b0*f->e0 + f->b1*f->e1 - f->a1*f->u1)/f->a0;
+		// update ei and ui for the next step through the loop
+		f->e1 = f->e0;
+		f->u1 = u0;
+		// advance to next biquad in array
+		f++;
+	}
+
+	// saturate y0 for D/A converter
+	u0 = SATURATE(u0, vmin, vmax);
+	return u0;
+
+}
+

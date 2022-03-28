@@ -1,0 +1,164 @@
+/* Lab 7 - Ali Jones*/
+
+/* includes */
+#include "stdio.h"
+#include "MyRio.h"
+#include "me477.h"
+#include <string.h>
+#include "ctable2.h"
+#include "TimerIRQ.h"
+#include <pthread.h>
+#include "emulate.h"
+
+/* prototypes */
+
+/* definitions */
+void* Timer_Irq_Thread(void* resource);
+
+/* global variables */
+typedef struct {
+	NiFpga_IrqContext irqContext;	// context
+	table *a_table;		// pointer to table
+	NiFpga_Bool irqThreadRdy;	// thread ready flag
+} ThreadResource;
+
+uint32_t timeoutValue;
+MyRio_Encoder encC0;
+
+int main(int argc, char **argv)
+{
+	NiFpga_Status status;
+	int32_t irq_status;
+	MyRio_IrqTimer irqTimer0;
+	ThreadResource irqThread0;
+	pthread_t thread;
+	char *Table_Title = "Motor Control Table";
+
+    status = MyRio_Open();		    /*Open the myRIO NiFpga Session.*/
+    if (MyRio_IsNotSuccess(status)) return status;
+
+    // initialize table editor variables
+    table my_table[] = {
+    		{"V_ref: (rpm)", 1, 0.},
+    		{"V_act: (rpm)", 0, 0.},
+    		{"VDAout (mV)",  0, 0.},
+    		{"Kp (V-s/rad)", 1, 0.},
+    		{"Ki (V/rad)",   1, 0.},
+    		{"BTI (ms)",     1, 5.0},
+    };
+
+    // Registers corresponding to the IRQ channel
+    irqTimer0.timerWrite = IRQTIMERWRITE;
+    irqTimer0.timerSet = IRQTIMERSETTIME;
+    timeoutValue = 500;
+
+    irq_status = Irq_RegisterTimerIrq( &irqTimer0,
+    							   	   &irqThread0.irqContext,
+    							   	   timeoutValue);
+
+    // Set the indicator to allow the new thread
+    irqThread0.irqThreadRdy = NiFpga_True;
+
+    // Create new thread to catch the IRQ
+    irq_status = pthread_create( &thread,
+    							 NULL,
+    							 Timer_Irq_Thread,
+    							 &irqThread0);
+
+    // Initialize the thread resource to point to table
+    irqThread0.a_table = my_table;
+
+    // Set the thread ready flag
+    irqThread0.irqThreadRdy = NiFpga_True;
+
+    // call the table editor
+    ctable2(Table_Title, my_table, 6);
+
+    // terminate thread
+	irqThread0.irqThreadRdy = NiFpga_False;
+	irq_status = pthread_join(thread, NULL);
+
+    // unregister timer interrupt
+	irq_status = Irq_UnregisterTimerIrq( &irqTimer0,
+										 irqThread0.irqContext);
+
+	status = MyRio_Close();	 /*Close the myRIO NiFpga Session. */
+	return status;
+}
+
+void* Timer_Irq_Thread(void* resource){
+
+	MyRio_Aio CI0, CO0;
+	double curr_speed, rpm;
+	ThreadResource* threadResource = (ThreadResource*) resource;
+
+	double *vref = &((threadResource->a_table+0)->value);
+	double *vact = &((threadResource->a_table+1)->value);
+	double *vdaout = &((threadResource->a_table+2)->value);
+	double *kp = &((threadResource->a_table+3)->value);
+	double *ki = &((threadResource->a_table+4)->value);
+	double *bti = &((threadResource->a_table+5)->value);
+
+	// initialize the I/O and set motor voltage to zero
+	AIO_initialize(&CI0, &CO0);
+	Aio_Write(&CI0, 0);
+
+	printf("%lf", *btf);
+
+	/*
+	// initialize the encoder interface
+	EncoderC_initialize(myrio_session, &encC0);
+
+	while (threadResource->irqThreadRdy == NiFpga_True){
+			/* pause the loop while waiting for interrupt */
+			uint32_t irqAssert = 0;
+			Irq_Wait( threadResource->irqContext,
+					  TIMERIRQNO,
+					  &irqAssert,
+					  (NiFpga_Bool*) &(threadResource->irqThreadRdy));
+			/* schedule the next interrupt */
+			NiFpga_WriteU32( myrio_session,
+							 IRQTIMERWRITE,
+							 timeoutValue);
+			NiFpga_WriteBool( myrio_session,
+							  IRQTIMERSETTIME,
+							  NiFpga_True);
+
+			if(irqAssert){
+				/* service interrupt */
+
+				curr_speed = vel();		// call vel() for current speed
+				rpm = curr_speed*(1/2000)*(1/(*bti))*60;	// convert from BDI/BTI to rpm
+
+				/* acknowledge interrupt */
+				Irq_Acknowledge(irqAssert);
+			}
+		}
+	/*
+
+}
+
+/*--------------------------------------------------
+ Function vel
+ 	 Purpose:		calculates velocity via encoder
+ 	 Parameters:	none
+ 	 Returns: 		motor angular velocity in BDI/BTI
+ *-------------------------------------------------*/
+double vel(void){
+	double curr_speed;
+	static int c_n, c_n1;	// current encoder count and previous encoder count
+	static int initial_call = 0;
+
+	c_n = Encoder_Counter(&encC0);	// get current count from encoder
+
+	if (initial_call == 0){		// if it's the first call,
+		c_n1 = c_n;					// set previous count = current count
+		initial_call++;
+	}
+
+	curr_speed = c_n - c_n1;	// calculate speed
+	c_n1 = c_n;					// set previous count = current count
+
+	return curr_speed;
+}
+

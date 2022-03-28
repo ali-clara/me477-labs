@@ -1,0 +1,48 @@
+/* Lab <number> - <your name> */
+
+/* includes */
+#include "stdio.h"
+#include "MyRio.h"
+#include "me477.h"
+#include <UART.h>
+#include "DIO.h"
+#include <time.h>
+#include <stdarg.h>
+#include <string.h>
+
+/* prototypes */
+int putchar_lcd(int value);
+
+
+/* definitions */
+
+int main(int argc, char **argv){
+	NiFpga_Status status;
+
+    status = MyRio_Open();		    /*Open the myRIO NiFpga Session.*/
+    if (MyRio_IsNotSuccess(status)) return status;
+
+    //my code here
+    printf("Lab #3 Hello World!\n");			// Print to Console
+    printf_lcd("\fLab #3 Hello World!\n");		// Print to LCD screen
+
+	status = MyRio_Close();	 /*Close the myRIO NiFpga Session. */
+	return status;
+}
+
+int putchar_lcd(value){
+
+	// initialize UART the first time the function is called
+	uart.name = "ASRL2::INSTR";
+	uart.defaultRM = 0;
+	uart.session = 0;
+	status = Uart_open(&uart,
+						19200,
+						8,
+						Uart_StopBits1_0,
+						Uart_ParityNone);
+
+	if (status == VI_SUCCESS){
+
+	}
+}

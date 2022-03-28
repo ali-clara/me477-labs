@@ -1,0 +1,135 @@
+/* Lab #2 - Ali Jones */
+
+/* includes */
+#include "stdio.h"
+#include "MyRio.h"
+#include "me477.h"
+#include <string.h>
+#include <stdarg.h>
+
+/* prototypes */
+double	double_in(char *prompt);
+char * fgets_keypad(char *buf, int buflen);
+int printf_lcd(char *format, ...);
+int putchar_lcd(int c);
+
+/* definitions */
+
+int main(int argc, char **argv)
+{
+	char *test = "hello";
+	char *prompt = "Enter Value pls: ";
+
+	NiFpga_Status status;
+
+    status = MyRio_Open();		    /*Open the myRIO NiFpga Session.*/
+    if (MyRio_IsNotSuccess(status)) return status;
+
+    //my code here
+//    printf("\f%s\n", test);					// Print to Console
+//    printf_lcd("\f%s\n", test);		// Print to LCD screen
+
+    double_in(prompt);
+
+	status = MyRio_Close();	 /*Close the myRIO NiFpga Session. */
+	return status;
+}
+
+double double_in(char *prompt){
+/*
+ * double_in
+ * Purpose: identifies prompt to print on lcd display and accepts user input. Ensures user input is valid
+ * Information transfer: receives prompts from 'main, sends prompts and outputs to 'printf_lcd' and
+ * 		'printf_lcd' to print, sends user input back to 'main'
+ * Input: prompt (character string from 'main')
+ */
+
+	// variables
+	char str[10];
+	double read_val;
+	char invalid_str[] = "[]";
+	char *up_down_check;
+	char doub_decimal[] = "..";
+	char *double_decimal_check;
+	int string_check = 0;		// bad string = 0, good string = 1
+	char *error_message = "Bad Key. Try Again";
+
+	// display prompt on lcd and take input
+	printf_lcd("\f%s\n", prompt);
+	fgets_keypad(str, 80);
+
+	// set up variables to check for bad strings
+	up_down_check = strpbrk(str, invalid_str);
+	double_decimal_check = strstr(str, doub_decimal);
+
+	// check for bad strings
+	while (string_check == 0){
+		if (str == NULL){
+			printf_lcd("\f%s\n", prompt);
+			printf_lcd("Short. Try again: ");
+			fgets_keypad(str, 10);
+		}
+		if (up_down_check){		// if variable not null
+			printf_lcd("\f%s\n", prompt);
+			printf_lcd("\f%s\n", error_message);
+			string_check = 0;		// indicates bad string
+
+			fgets_keypad(str, 10);
+
+			// recheck input string validity
+			up_down_check = strpbrk(str, invalid_str);
+			double_decimal_check = strstr(str, doub_decimal);
+		}
+		if (double_decimal_check){		// if variable not null
+			printf_lcd("\f%s\n", prompt);
+			printf_lcd("\f%s\n", error_message);
+			string_check = 0;		// indicates bad string
+
+			fgets_keypad(str, 10);
+
+			// recheck input string validity
+			double_decimal_check = strstr(str, doub_decimal);
+			up_down_check = strpbrk(str, invalid_str);
+		}
+		else{
+			printf_lcd("\fValue Accepted\n");
+			printf_lcd(str);
+			string_check = 1;		// indicates good string
+		}
+	}
+
+	sscanf(str, "%lf", &read_val);		// convert from string to float
+	return read_val;
+}
+
+int printf_lcd(char *format, ...){
+/*
+ * printf_lcd
+ * Purpose: Prints to lcd screen
+ * Information transfer: receives string  to print from double_in
+ * Input: format
+ */
+
+	// variables
+	int val;
+	char str[80];
+	char *point;
+
+	point = &str[0];
+
+	// writing the data to a string
+	va_list args;
+	va_start(args, format);
+		val = vsprintf(str, format, args);
+	va_end(args);
+
+	// loops across the length of 'str' to print every character
+	int i = 0;
+	while (i < strlen(str)){
+		putchar_lcd(*point);
+		point++;
+		++i;
+	}
+
+	return *point;
+}

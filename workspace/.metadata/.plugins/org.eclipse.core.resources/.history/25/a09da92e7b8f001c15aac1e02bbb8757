@@ -1,0 +1,52 @@
+/* Lab #5 - Ali Jones */
+
+/* includes */
+#include "stdio.h"
+#include "MyRio.h"
+#include "me477.h"
+#include <string.h>
+
+/* prototypes */
+//double    double_in(char *prompt);
+void wait(void);
+
+/* definitions */
+
+int main(int argc, char **argv)
+{
+    int i;
+    int j;
+	NiFpga_Status status;
+
+    status = MyRio_Open();            /*Open the myRIO NiFpga Session.*/
+    if (MyRio_IsNotSuccess(status)) return status;
+
+    //my code here
+    for (i=1; i == 60; i++){
+    	for (j=0; j<200; j++){
+    		wait();
+    	}
+    	printf_lcd("\f%d", i);
+    }
+
+    status = MyRio_Close();     /*Close the myRIO NiFpga Session. */
+    return status;
+}
+
+/*--------------------------------------------------
+ Function wait
+ 	 Purpose:		waits for xx ms
+ 	 Parameters:	none
+ 	 Returns: 		none
+ *-------------------------------------------------*/
+void wait(void){
+	uint32_t i;
+
+	i = 417000;
+	while(i>0){
+		i--;
+	}
+
+	return;
+}
+

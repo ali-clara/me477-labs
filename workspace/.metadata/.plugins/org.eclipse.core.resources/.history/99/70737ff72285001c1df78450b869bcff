@@ -1,0 +1,88 @@
+/* Lab <number> - <your name> */
+
+/* includes */
+#include "stdio.h"
+#include "MyRio.h"
+#include "me477.h"
+#include "UART.h"
+#include "DIO.h"
+#include <time.h>
+#include <stdarg.h>
+#include <string.h>
+
+/* prototypes */
+int putchar_lcd(int value);
+
+
+/* definitions */
+
+int main(int argc, char **argv){
+	NiFpga_Status status;
+
+    status = MyRio_Open();		    /*Open the myRIO NiFpga Session.*/
+    if (MyRio_IsNotSuccess(status)) return status;
+
+    //my code here
+//    printf("Lab #3 Hello World!\n");			// Print to Console
+//    printf_lcd("\fLab #3 Hello World!\n");		// Print to LCD screen
+
+    printf_lcd("\f h");
+
+	status = MyRio_Close();	 /*Close the myRIO NiFpga Session. */
+	return status;
+}
+
+#define flag 0
+
+int putchar_lcd(value){
+
+	static MyRio_Uart uart;
+	NiFpga_Status status;
+	uint8_t writeS[5];
+	size_t nData;
+	int i;
+
+	// initialize UART the first time the function is called
+	if (flag == 0){
+		uart.name = "ASRL2::INSTR";
+		uart.defaultRM = 0;
+		uart.session = 0;
+		status = Uart_Open(&uart,
+							19200,
+							8,
+							Uart_StopBits1_0,
+							Uart_ParityNone);
+//		flag = 1;
+	}
+
+	if (status < VI_SUCCESS)
+		return EOF;
+	if (value > 255)
+		return EOF;
+	else if (value == '\f'){
+		writeS[0] = 12;
+		writeS[1] = 17;
+		nData = 2;
+	}
+	else if (value == '\b'){
+		writeS[0] = 8;
+		nData = 1;
+	}
+	else if (value == '\v'){
+		writeS[0] = 128;
+		nData = 1;
+	}
+	else if (value == '\n'){
+		writeS[0] = 13;
+		nData = 1;
+	}
+	else{
+//		for(i=0; i<4; i++){
+//			writeS[i] = value;		// ascii
+//		}
+		writeS[i] = value;
+		nData = sizeof(writeS);
+	}
+
+	status = Uart_Write(&uart, writeS, nData);
+}
